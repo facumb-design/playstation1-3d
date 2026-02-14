@@ -290,6 +290,12 @@ export default function Experience() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [actionLayout, setActionLayout] = useState(ACTION_LAYOUTS[0]);
 
+  // Ref to track currentVideoIndex without stale closures
+  const currentVideoIndexRef = useRef(currentVideoIndex);
+  useEffect(() => {
+    currentVideoIndexRef.current = currentVideoIndex;
+  }, [currentVideoIndex]);
+
   // ── Animated reset state ──────────────────────────────────────
   const [isResetting, setIsResetting] = useState(false);
   const [zoomOutTrigger, setZoomOutTrigger] = useState(0);
@@ -328,6 +334,19 @@ export default function Experience() {
     const video = texture.source.data;
     videoRef.current = video;
     video.currentTime = 0;
+
+    // When the video ends, automatically play the next one
+    video.addEventListener("ended", () => {
+      const nextIndex =
+        (currentVideoIndexRef.current + 1) % VIDEOS.length;
+      video.pause();
+      videoRef.current = null;
+      setIsPlaying(false);
+      setVideoTexture(null);
+      setCurrentVideoIndex(nextIndex);
+      setVideoSrc(VIDEOS[nextIndex].src);
+    });
+
     video
       .play()
       .then(() => {
@@ -368,22 +387,6 @@ export default function Experience() {
     setCurrentVideoIndex(newIndex);
     setVideoSrc(VIDEOS[newIndex].src);
   }, []);
-
-  // ── Auto-advance to next video when current one ends ────────
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const handleVideoEnded = () => {
-      const next = (currentVideoIndex + 1) % VIDEOS.length;
-      handleSwitchVideo(next);
-    };
-
-    video.addEventListener('ended', handleVideoEnded);
-    return () => {
-      video.removeEventListener('ended', handleVideoEnded);
-    };
-  }, [currentVideoIndex, handleSwitchVideo]);
 
   // ── Hide/show callbacks ─────────────────────────────────────
   const handleHide = useCallback(() => {
