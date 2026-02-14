@@ -12,6 +12,7 @@ import {
   Environment,
   ContactShadows,
   useVideoTexture,
+  Html,
 } from "@react-three/drei";
 import * as THREE from "three";
 import gsap from "gsap";
@@ -257,7 +258,7 @@ function VideoTextureLoader({ src, onReady }) {
     unsuspend: "loadedmetadata",
     start: false,
     muted: false,
-    loop: true,
+    loop: false,
     crossOrigin: "anonymous",
   });
 
@@ -300,6 +301,10 @@ export default function Experience() {
   const [isHidden, setIsHidden] = useState(false);
   const hasShownControlsRef = useRef(false);
   const showTimerRef = useRef(null);
+
+  // ── Instruction tooltip state ────────────────────────────────
+  const [showInstructionTooltip, setShowInstructionTooltip] = useState(false);
+  const instructionTimerRef = useRef(null);
 
   // ── Scene callbacks ─────────────────────────────────────────
   const handleScreenReady = useCallback((center) => {
@@ -363,6 +368,22 @@ export default function Experience() {
     setCurrentVideoIndex(newIndex);
     setVideoSrc(VIDEOS[newIndex].src);
   }, []);
+
+  // ── Auto-advance to next video when current one ends ────────
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleVideoEnded = () => {
+      const next = (currentVideoIndex + 1) % VIDEOS.length;
+      handleSwitchVideo(next);
+    };
+
+    video.addEventListener('ended', handleVideoEnded);
+    return () => {
+      video.removeEventListener('ended', handleVideoEnded);
+    };
+  }, [currentVideoIndex, handleSwitchVideo]);
 
   // ── Hide/show callbacks ─────────────────────────────────────
   const handleHide = useCallback(() => {
@@ -533,6 +554,28 @@ export default function Experience() {
     return () => window.removeEventListener("keydown", handler);
   }, [showControls, isHidden, handleShow]);
 
+  // ── Show instruction after 10s if PS1 not clicked ─────────────
+  useEffect(() => {
+    // Only show if user hasn't zoomed in yet and not resetting
+    if (zoomTrigger === 0 && !isResetting && !videoSrc) {
+      instructionTimerRef.current = setTimeout(() => {
+        setShowInstructionTooltip(true);
+      }, 20000);
+    } else {
+      setShowInstructionTooltip(false);
+      if (instructionTimerRef.current) {
+        clearTimeout(instructionTimerRef.current);
+        instructionTimerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (instructionTimerRef.current) {
+        clearTimeout(instructionTimerRef.current);
+      }
+    };
+  }, [zoomTrigger, isResetting, videoSrc]);
+
   // ── Styles for residual elements & mode switcher ────────────
   const controlsAreaStyle = {
     position: "absolute",
@@ -632,6 +675,37 @@ export default function Experience() {
     borderRadius: 6,
   };
 
+  // ── Instruction tooltip styles (3D Html label) ────────────────
+  const tooltip3dContainerStyle = {
+    textAlign: "center",
+    fontFamily: "'Courier New', monospace",
+    userSelect: "none",
+    animation:
+      "tooltip-float 3s ease-in-out infinite, tooltip-fade-in 1.5s ease-out",
+  };
+
+  const tooltip3dPressStyle = {
+    fontSize: 9,
+    fontWeight: "bold",
+    color: "#888",
+    letterSpacing: 4,
+    textTransform: "uppercase",
+    marginBottom: 2,
+  };
+
+  const tooltip3dSubStyle = {
+    fontSize: 11,
+    color: "#555",
+    letterSpacing: 1,
+  };
+
+  const tooltip3dArrowStyle = {
+    fontSize: 10,
+    color: "#aaa",
+    marginTop: 4,
+    animation: "tooltip-bounce 1.2s ease-in-out infinite",
+  };
+
   const panelReady = (videoTexture || isResetting) && showControls;
   const panelVisible = panelReady && !isHidden;
   const panelHidden = panelReady && isHidden;
@@ -651,6 +725,18 @@ export default function Experience() {
           50%  { background-position: 15px -20px; }
           75%  { background-position: -10px 30px; }
           100% { background-position: 20px -10px; }
+        }
+        @keyframes tooltip-float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-4px); }
+        }
+        @keyframes tooltip-fade-in {
+          0% { opacity: 0; transform: translateY(8px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes tooltip-bounce {
+          0%, 100% { transform: translateY(0); opacity: 0.4; }
+          50% { transform: translateY(3px); opacity: 1; }
         }
         .ps1-case {
           transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, filter 0.15s ease;
@@ -717,6 +803,19 @@ export default function Experience() {
           videoTexture={videoTexture}
           openLidTrigger={openLidTrigger}
         />
+
+        {/* ── Instruction tooltip (3D floating label) ─────────── */}
+        {showInstructionTooltip && (
+          <group position={[0.6, 0.95, 0.8]}>
+            <Html center occlude distanceFactor={4} style={{ pointerEvents: "none" }}>
+              <div style={tooltip3dContainerStyle}>
+                <div style={tooltip3dPressStyle}>PRESS START</div>
+                <div style={tooltip3dSubStyle}>Click on the PlayStation</div>
+                <div style={tooltip3dArrowStyle}>&#9660;</div>
+              </div>
+            </Html>
+          </group>
+        )}
       </Canvas>
 
       {/* ── Controls area (bottom-left) ──────────────────────── */}
@@ -789,6 +888,7 @@ export default function Experience() {
           )}
         </div>
       )}
+
     </div>
   );
 }

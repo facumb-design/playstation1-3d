@@ -36,3 +36,4 @@ dist-ssr
 # Test output
 test-results/
 playwright-output/
+.vercel
