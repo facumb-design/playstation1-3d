@@ -12,7 +12,7 @@ import {
   Environment,
   ContactShadows,
   useVideoTexture,
-  Text,
+  Html,
 } from "@react-three/drei";
 import * as THREE from "three";
 import gsap from "gsap";
@@ -290,12 +290,6 @@ export default function Experience() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [actionLayout, setActionLayout] = useState(ACTION_LAYOUTS[0]);
 
-  // Ref to track currentVideoIndex without stale closures
-  const currentVideoIndexRef = useRef(currentVideoIndex);
-  useEffect(() => {
-    currentVideoIndexRef.current = currentVideoIndex;
-  }, [currentVideoIndex]);
-
   // ── Animated reset state ──────────────────────────────────────
   const [isResetting, setIsResetting] = useState(false);
   const [zoomOutTrigger, setZoomOutTrigger] = useState(0);
@@ -334,19 +328,6 @@ export default function Experience() {
     const video = texture.source.data;
     videoRef.current = video;
     video.currentTime = 0;
-
-    // When the video ends, automatically play the next one
-    video.addEventListener("ended", () => {
-      const nextIndex =
-        (currentVideoIndexRef.current + 1) % VIDEOS.length;
-      video.pause();
-      videoRef.current = null;
-      setIsPlaying(false);
-      setVideoTexture(null);
-      setCurrentVideoIndex(nextIndex);
-      setVideoSrc(VIDEOS[nextIndex].src);
-    });
-
     video
       .play()
       .then(() => {
@@ -387,6 +368,22 @@ export default function Experience() {
     setCurrentVideoIndex(newIndex);
     setVideoSrc(VIDEOS[newIndex].src);
   }, []);
+
+  // ── Auto-advance to next video when current one ends ────────
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleVideoEnded = () => {
+      const next = (currentVideoIndex + 1) % VIDEOS.length;
+      handleSwitchVideo(next);
+    };
+
+    video.addEventListener('ended', handleVideoEnded);
+    return () => {
+      video.removeEventListener('ended', handleVideoEnded);
+    };
+  }, [currentVideoIndex, handleSwitchVideo]);
 
   // ── Hide/show callbacks ─────────────────────────────────────
   const handleHide = useCallback(() => {
@@ -563,7 +560,7 @@ export default function Experience() {
     if (zoomTrigger === 0 && !isResetting && !videoSrc) {
       instructionTimerRef.current = setTimeout(() => {
         setShowInstructionTooltip(true);
-      }, 10000);
+      }, 20000);
     } else {
       setShowInstructionTooltip(false);
       if (instructionTimerRef.current) {
@@ -678,49 +675,35 @@ export default function Experience() {
     borderRadius: 6,
   };
 
-  // ── Instruction tooltip styles (2D overlay) ──────────────────
-  const instructionOverlayStyle = {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    zIndex: 5,
-    pointerEvents: "none",
-    animation: "fade-in-pulse 2s ease-out",
-  };
-
-  const instructionBoxStyle = {
-    background: "linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%)",
-    border: "3px solid #ff3333",
-    borderRadius: 8,
-    padding: "24px 32px",
-    boxShadow:
-      "0 0 20px rgba(255, 51, 51, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)",
+  // ── Instruction tooltip styles (3D Html label) ────────────────
+  const tooltip3dContainerStyle = {
     textAlign: "center",
     fontFamily: "'Courier New', monospace",
+    userSelect: "none",
+    animation:
+      "tooltip-float 3s ease-in-out infinite, tooltip-fade-in 1.5s ease-out",
   };
 
-  const instructionTextStyle = {
-    fontSize: 32,
+  const tooltip3dPressStyle = {
+    fontSize: 9,
     fontWeight: "bold",
-    color: "#ff3333",
-    textShadow:
-      "0 0 10px rgba(255, 51, 51, 0.8), 0 2px 4px rgba(0,0,0,0.8)",
-    letterSpacing: 4,
-    marginBottom: 8,
-  };
-
-  const instructionSubtextStyle = {
-    fontSize: 14,
     color: "#888",
-    letterSpacing: 2,
-    marginBottom: 12,
+    letterSpacing: 4,
+    textTransform: "uppercase",
+    marginBottom: 2,
   };
 
-  const instructionBlinkStyle = {
-    fontSize: 20,
-    color: "#ff3333",
-    animation: "blink-arrow 1s ease-in-out infinite",
+  const tooltip3dSubStyle = {
+    fontSize: 11,
+    color: "#555",
+    letterSpacing: 1,
+  };
+
+  const tooltip3dArrowStyle = {
+    fontSize: 10,
+    color: "#aaa",
+    marginTop: 4,
+    animation: "tooltip-bounce 1.2s ease-in-out infinite",
   };
 
   const panelReady = (videoTexture || isResetting) && showControls;
@@ -743,14 +726,17 @@ export default function Experience() {
           75%  { background-position: -10px 30px; }
           100% { background-position: 20px -10px; }
         }
-        @keyframes fade-in-pulse {
-          0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
-          50% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
-          100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        @keyframes tooltip-float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-4px); }
         }
-        @keyframes blink-arrow {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 1; }
+        @keyframes tooltip-fade-in {
+          0% { opacity: 0; transform: translateY(8px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes tooltip-bounce {
+          0%, 100% { transform: translateY(0); opacity: 0.4; }
+          50% { transform: translateY(3px); opacity: 1; }
         }
         .ps1-case {
           transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, filter 0.15s ease;
@@ -818,22 +804,17 @@ export default function Experience() {
           openLidTrigger={openLidTrigger}
         />
 
-        {/* ── Instruction tooltip (3D floating text) ──────────── */}
+        {/* ── Instruction tooltip (3D floating label) ─────────── */}
         {showInstructionTooltip && (
-          <Text
-            position={[0.8, 1.2, 0.5]}
-            rotation={[0, -Math.PI / 6, 0]}
-            fontSize={0.12}
-            maxWidth={2}
-            lineHeight={1.2}
-            letterSpacing={0.05}
-            textAlign="center"
-            color="#ff3333"
-            outlineWidth={0.01}
-            outlineColor="#000000"
-          >
-            {"PRESS START\nClick PlayStation to begin"}
-          </Text>
+          <group position={[0.6, 0.95, 0.8]}>
+            <Html center occlude distanceFactor={4} style={{ pointerEvents: "none" }}>
+              <div style={tooltip3dContainerStyle}>
+                <div style={tooltip3dPressStyle}>PRESS START</div>
+                <div style={tooltip3dSubStyle}>Click on the PlayStation</div>
+                <div style={tooltip3dArrowStyle}>&#9660;</div>
+              </div>
+            </Html>
+          </group>
         )}
       </Canvas>
 
@@ -908,18 +889,6 @@ export default function Experience() {
         </div>
       )}
 
-      {/* ── Instruction tooltip (2D overlay) ──────────────────── */}
-      {showInstructionTooltip && (
-        <div style={instructionOverlayStyle}>
-          <div style={instructionBoxStyle}>
-            <div style={instructionTextStyle}>PRESS START</div>
-            <div style={instructionSubtextStyle}>
-              Click PlayStation to begin
-            </div>
-            <div style={instructionBlinkStyle}>▼</div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
