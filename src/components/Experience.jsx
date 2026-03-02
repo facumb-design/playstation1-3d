@@ -709,6 +709,39 @@ export default function Experience() {
     animation: "tooltip-bounce 1.2s ease-in-out infinite",
   };
 
+  // ── 3D Model Credits styles ────────────────────────────────
+  const creditContainerStyle = {
+    position: "fixed",
+    top: 16,
+    right: 16,
+    zIndex: 100,
+    fontFamily: "'Courier New', monospace",
+    fontSize: 10,
+    color: "#888",
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    userSelect: "none",
+    pointerEvents: "auto",
+  };
+
+  const creditIconStyle = {
+    fontSize: 14,
+    color: "#888",
+    cursor: "help",
+    transition: "color 0.2s ease",
+  };
+
+  const creditTextStyle = {
+    opacity: 0,
+    maxWidth: 0,
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+    color: "#555",
+    transition: "opacity 0.3s ease, max-width 0.3s ease",
+    letterSpacing: 0.5,
+  };
+
   const panelReady = (videoTexture || isResetting) && showControls;
   const panelVisible = panelReady && !isHidden;
   const panelHidden = panelReady && isHidden;
@@ -891,6 +924,34 @@ export default function Experience() {
           )}
         </div>
       )}
+
+      {/* ── 3D Model Credits ───────────────────────────────────── */}
+      <div
+        style={creditContainerStyle}
+        onMouseEnter={(e) => {
+          const text = e.currentTarget.querySelector('.credit-text');
+          const icon = e.currentTarget.querySelector('.credit-icon');
+          if (text) {
+            text.style.opacity = '1';
+            text.style.maxWidth = '200px';
+          }
+          if (icon) icon.style.color = '#aaa';
+        }}
+        onMouseLeave={(e) => {
+          const text = e.currentTarget.querySelector('.credit-text');
+          const icon = e.currentTarget.querySelector('.credit-icon');
+          if (text) {
+            text.style.opacity = '0';
+            text.style.maxWidth = '0';
+          }
+          if (icon) icon.style.color = '#888';
+        }}
+      >
+        <span className="credit-icon" style={creditIconStyle}>ⓘ</span>
+        <span className="credit-text" style={creditTextStyle}>
+          3D model by: dark_igorek
+        </span>
+      </div>
 
     </div>
   );
